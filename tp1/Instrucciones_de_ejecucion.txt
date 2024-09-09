@@ -1,0 +1,12 @@
+Para ejecutar la aplicación se necesita NODE.js ya que la aplicación fue hecha con JavaScript.
+
+Una vez instalado node, se ejecuta de la siguiente manera:
+
+node ruta_del_archivo.js ruta_del_sample [N]
+
+o
+
+node nombredelarchivo.js nombre_del_sample [N]
+
+
+
