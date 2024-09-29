@@ -1,6 +1,6 @@
 Para ejecutar la aplicación se necesita NODE.js ya que la aplicación fue hecha con JavaScript.
 
-Una vez instalado node, se ejecuta de la siguiente manera (en un bash del sistema operativo):
+Una vez instalado node, se ejecuta de la siguiente manera:
 
 node ruta_del_archivo.js ruta_del_sample [N]
 
