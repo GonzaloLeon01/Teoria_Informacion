@@ -21,7 +21,7 @@ function checkKraftMcMillan(words, alphabetSize) {
     (acc, len) => acc + Math.pow(alphabetSize, -len),
     0
   ); //Suma en el vector cada elemento haciendo   1/(alphabetSize**(len)) len es el elemento
-  console.log("Kraft-McMillan sum:", sum);
+  console.log("Suma de Kraft-McMillan:", sum);
   return sum <= 1;
 }
 //Verifica que cada palabra no tenga prefijos
@@ -83,30 +83,35 @@ function main() {
   const alphabet = getAlphabet(words);
   const alphabetSize = alphabet.length;
 
-  console.log("Alphabet:", alphabet.join(""));
-  console.log("Alphabet size:", alphabetSize);
+  console.log("Alfabeto:", alphabet.join(""));
+  console.log("Tamaño del alfabeto:", alphabetSize);
   const kraftMcMillanSatisfied = checkKraftMcMillan(words, alphabetSize);
-  console.log("Kraft-McMillan inequality satisfied:", kraftMcMillanSatisfied);
+  console.log(
+    "Desigualdad de Kraft-McMillan satisfecha:",
+    kraftMcMillanSatisfied
+  );
 
   const instantaneous = isInstantaneous(words);
-  console.log("Is instantaneous code:", instantaneous);
+  console.log("Es código instantáneo:", instantaneous);
 
   if (kraftMcMillanSatisfied && instantaneous) {
     const probabilities = calculateProbabilities(words, alphabetSize);
 
     if (probabilities.reduce((acc, p) => acc + p, 0) >= 1) {
       console.log("Es compacto ya que la suma de las probabilidades es 1");
-      console.log("Probabilities for compact code:", probabilities);
+      console.log("Probabilidades para código compacto:", probabilities);
       const entropy = calculateEntropy(probabilities, alphabetSize);
-      console.log("Entropy:", entropy);
+      console.log("Entropía:", entropy);
 
       const averageLength = calculateAverageLength(words, probabilities);
-      console.log("Average code length:", averageLength);
+      console.log("Longitud promedio del código:", averageLength);
 
       if (N !== null && outputFile) {
         const message = generateRandomMessage(words, probabilities, N);
         fs.writeFileSync(outputFile, message, "ascii");
-        console.log(`Random message of ${N} symbols written to ${outputFile}`);
+        console.log(
+          `Mensaje aleatorio de ${N} símbolos escrito en ${outputFile}`
+        );
       }
     }
   } else {
