@@ -5,7 +5,7 @@ function readInputFile(filename) {
     const data = fs.readFileSync(filename, "ascii");
     return data.trim().split(/\s+/);
   } catch (err) {
-    console.error(`Error leyendo el archivo de entrada: ${err.message}`);
+    console.error(`Error reading input file: ${err.message}`);
     process.exit(1);
   }
 }
@@ -16,11 +16,12 @@ function getAlphabet(words) {
 
 function checkKraftMcMillan(words, alphabetSize) {
   const lengths = words.map((word) => word.length);
+  console.log(lengths);
   const sum = lengths.reduce(
     (acc, len) => acc + Math.pow(alphabetSize, -len),
     0
-  );
-  console.log("sumatoria Kraft-McMillan :", sum);
+  ); //Suma en el vector cada elemento haciendo   1/(alphabetSize**(len)) len es el elemento
+  console.log("Kraft-McMillan sum:", sum);
   return sum <= 1;
 }
 //Verifica que cada palabra no tenga prefijos
@@ -36,22 +37,12 @@ function isInstantaneous(words) {
 }
 
 function calculateProbabilities(words, alphabetSize) {
-  //REFACTOR
-  let wordsaux = words.map((word) => Math.pow(1 / alphabetSize, word.length));
-
-  console.log(
-    "suma de probabilidades: " + wordsaux.reduce((acc, p) => acc + p, 0)
-  );
-  if (wordsaux.reduce((acc, p) => acc + p, 0) < 1)
-    console.log(
-      "El codigo no es compacto para ninguna distribucion de probabilidades, se podrian usar longitudes mas pequeñas(no calcular la entropia ni longitud media)"
-    );
   return words.map((word) => Math.pow(1 / alphabetSize, word.length));
 }
 
 function calculateEntropy(probabilities, alphabetSize) {
   const base = Math.log(alphabetSize);
-  return -probabilities.reduce((acc, p) => acc + (p * Math.log(p)) / base, 0);
+  return -probabilities.reduce((acc, p) => acc + (p * Math.log(p)) / base, 0); //calculo de entropia revisado
 }
 
 function calculateAverageLength(words, probabilities) {
@@ -70,7 +61,7 @@ function generateRandomMessage(words, probabilities, N) {
       cumProb += probabilities[j];
       if (rand < cumProb) {
         message += words[j] + " ";
-        break; //💀
+        break;
       }
     }
   }
@@ -80,7 +71,7 @@ function generateRandomMessage(words, probabilities, N) {
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1 || args.length > 3) {
-    console.error("Uso: node tpi2.js input.txt [output.txt N]");
+    console.error("Usage: node tpi2.js input.txt [output.txt N]");
     process.exit(1);
   }
 
@@ -92,43 +83,34 @@ function main() {
   const alphabet = getAlphabet(words);
   const alphabetSize = alphabet.length;
 
-  console.log("Alfabeto codigo:", alphabet.join(""));
-  console.log("Tamaño del Alfabeto:", alphabetSize);
+  console.log("Alphabet:", alphabet.join(""));
+  console.log("Alphabet size:", alphabetSize);
   const kraftMcMillanSatisfied = checkKraftMcMillan(words, alphabetSize);
-  console.log(
-    "Satisface la inecuacion de Kraft-McMillan?:",
-    kraftMcMillanSatisfied
-  );
+  console.log("Kraft-McMillan inequality satisfied:", kraftMcMillanSatisfied);
 
   const instantaneous = isInstantaneous(words);
-  console.log("Es codigo instantaneo?:", instantaneous);
+  console.log("Is instantaneous code:", instantaneous);
 
   if (kraftMcMillanSatisfied && instantaneous) {
     const probabilities = calculateProbabilities(words, alphabetSize);
-    //funcion si es compacto
-    //if(escompacto)
-    console.log("Probabilidades para ser codigo compacto:", probabilities);
 
-    if (probabilities.reduce((acc, p) => acc + p, 0) >= 0.99) {
+    if (probabilities.reduce((acc, p) => acc + p, 0) >= 1) {
       console.log("Es compacto ya que la suma de las probabilidades es 1");
-    }
+      console.log("Probabilities for compact code:", probabilities);
+      const entropy = calculateEntropy(probabilities, alphabetSize);
+      console.log("Entropy:", entropy);
 
-    const entropy = calculateEntropy(probabilities, alphabetSize);
-    console.log("Entropia:", entropy);
+      const averageLength = calculateAverageLength(words, probabilities);
+      console.log("Average code length:", averageLength);
 
-    const averageLength = calculateAverageLength(words, probabilities);
-    console.log("Longitud media del codigo:", averageLength);
-
-    //este lo hace igual
-    if (N !== null && outputFile) {
-      const message = generateRandomMessage(words, probabilities, N);
-      fs.writeFileSync(outputFile, message, "ascii");
-      console.log(
-        `Mensaje aleatorio de ${N} simbolos escrito en ${outputFile}`
-      );
+      if (N !== null && outputFile) {
+        const message = generateRandomMessage(words, probabilities, N);
+        fs.writeFileSync(outputFile, message, "ascii");
+        console.log(`Random message of ${N} symbols written to ${outputFile}`);
+      }
     }
   } else {
-    console.log("El codigo no es compacto.");
+    console.log("The code is not compact.");
   }
 }
 
