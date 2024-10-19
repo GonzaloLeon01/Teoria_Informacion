@@ -3,372 +3,278 @@
 const fs = require('fs');
 
 // Clase para nodos del árbol de Huffman
-class HuffmanNode {
-    constructor(char, freq) {
-        this.char = char;
-        this.freq = freq;
+class Nodo {
+    constructor(caracter, frecuencia) {
+        this.caracter = caracter;
+        this.frecuencia = frecuencia;
         this.left = null;
         this.right = null;
     }
 }
 
-// Implementación del algoritmo de Huffman
-class HuffmanCoding {
+class Huffman {
+
     constructor() {
-        this.codes = new Map();
+        //metadatos
+        this.tabla = new Map();
+        this.frequencies = new Map();
+        //entropia
     }
+    construirArbolDeHuffman() {//mod
 
-    buildHuffmanTree(text) {
-        // Calcular frecuencias
-        const frequencies = new Map();
-        for (let char of text) {
-            frequencies.set(char, (frequencies.get(char) || 0) + 1);
-        }
-
+        
         // Crear nodos iniciales
-        const nodes = Array.from(frequencies.entries()).map(
-            ([char, freq]) => new HuffmanNode(char, freq)
+        const nodosHuffman = Array.from(this.frequencies.entries()).map(
+            ([char, frecuencia]) => new Nodo(char, frecuencia)
         );
+//////////////////////////////////////
+        ////muestra
+        //console.log(this.frequencies);
+        nodosHuffman.sort((a, b) => b.frecuencia - a.frecuencia);//borrar
+        console.log(nodosHuffman);
+//////////////////////////////////////
 
         // Construir árbol
-        while (nodes.length > 1) {
-            nodes.sort((a, b) => a.freq - b.freq);
-            const left = nodes.shift();
-            const right = nodes.shift();
-            const parent = new HuffmanNode(null, left.freq + right.freq);
+        while (nodosHuffman.length > 1) {//por alguna razon lo hace mal
+            nodosHuffman.sort((a, b) => a.frecuencia - b.frecuencia);
+            const left = nodosHuffman.shift();
+            const right = nodosHuffman.shift();
+            const parent = new Nodo(null, left.frecuencia + right.frecuencia);
             parent.left = left;
             parent.right = right;
-            nodes.push(parent);
+            nodosHuffman.push(parent);
         }
 
         // Generar códigos
-        this.generateCodes(nodes[0], "");
-        return nodes[0];
+        this.generarCodigos(nodosHuffman[0], "");
+
+        //////////////////////////////////////////////
+        let tablaOrdenada = Array.from(this.tabla).sort((a, b) => a[1].length - b[1].length);
+
+        // Mostrar los elementos ordenados por la longitud del código
+        console.log("Contenido de la tabla ordenada por longitud del código:");
+        tablaOrdenada.forEach(([char, code], index) => {
+            console.log(`Elemento ${index}: Caracter = ${char}, Código = ${code}, Longitud = ${code.length}`);
+        });
+        //////////////////////////////////////////////d
+
+        return nodosHuffman[0];
     }
 
-    generateCodes(node, code) {
-        if (node.char !== null) {
-            this.codes.set(node.char, code);
-            return;
+    generarCodigos(node, codigo) {
+        if (node != null) {
+            //console.log("aaca1");
+            if (node.caracter !== null) {
+                //console.log("aaca2");
+                this.tabla.set(node.caracter, codigo);
+                return;
+            }
+            this.generarCodigos(node.left, codigo + "0");
+            this.generarCodigos(node.right, codigo + "1");
         }
-        this.generateCodes(node.left, code + "0");
-        this.generateCodes(node.right, code + "1");
-    }
 
-    compress(text) {
-        const root = this.buildHuffmanTree(text);
-        let compressed = "";
-        for (let char of text) {
-            compressed += this.codes.get(char);
-        }
         
+    }
+
+    comprimir(arch) {
+        // Calcular frecuencias
+        //const frequencies = new Map();
+        for (let char of arch) {
+            this.frequencies.set(char, (this.frequencies.get(char) || 0) + 1);//Para cada carácter (char) en el archivo, se verifica si ya existe en el mapa frequencies. Si no está, su valor inicial es 0. Si ya está, se incrementa en 1 su frecuencia.
+        }
+        const raiz = this.construirArbolDeHuffman();
+        let compressed = "";
+        for (let char of arch) {
+            compressed += this.tabla.get(char);//agrega bytes en forma de codigo
+        }
+        //console.log(compressed);
         // Convertir a Buffer para guardar en archivo
-        const buffer = Buffer.alloc(Math.ceil(compressed.length / 8) + 1);
+        const buffer = Buffer.alloc(Math.ceil(compressed.length / 8) + this.frequencies.size * 3 + 1);//buffer de size bytes falta la cabecera
         let currentByte = 0;
         let bitCount = 0;
-        
+
+        //agregar cabecera a la tabla (cantidad de pares, caracter, frecuencia)
+        var index = 1;
+        buffer[0] = this.frequencies.size - 1;//almacena el número de caracteres únicos en el archivo 
+        for (let [char, frec] of this.frequencies) {
+            buffer[index] = char;
+            buffer[index + 1] = (frec >> 8) & 0xFF; // Guardamos el byte alto la parte alta de la frecuencia
+            buffer[index + 2] = frec & 0xFF; //byte bajo
+            index += 3;
+        }
+        console.log(buffer);
+
+        //Convertir la cadena comprimida a bytes
         for (let i = 0; i < compressed.length; i++) {
             currentByte = (currentByte << 1) | (compressed[i] === "1" ? 1 : 0);
             bitCount++;
-            
+
             if (bitCount === 8) {
-                buffer[Math.floor(i / 8)] = currentByte;
+                buffer[index + Math.floor(i / 8)] = currentByte;
                 currentByte = 0;
                 bitCount = 0;
             }
         }
-        
+
+
         // Guardar bits restantes
         if (bitCount > 0) {
             currentByte = currentByte << (8 - bitCount);
-            buffer[Math.floor(compressed.length / 8)] = currentByte;
+            buffer[index + Math.floor(compressed.length / 8)] = currentByte;
         }
-        
-        return {
-            data: buffer,
-            tree: root,
-            codes: this.codes
-        };
-    }
+        console.log(buffer);
 
-    decompress(compressed, tree) {
-        let current = tree;
-        let decompressed = "";
-        let bits = "";
-        
-        // Convertir buffer a string de bits
-        for (let byte of compressed) {
-            bits += byte.toString(2).padStart(8, '0');
-        }
-        
-        for (let bit of bits) {
-            if (bit === "0") {
-                current = current.left;
-            } else {
-                current = current.right;
-            }
-            
-            if (current.char !== null) {
-                decompressed += current.char;
-                current = tree;
-            }
-        }
-        
-        return decompressed;
-    }
-}
-
-// Implementación del algoritmo Shannon-Fano
-class ShannonFano {
-    constructor() {
-        this.codes = new Map();
-    }
-
-    buildShannonFanoCodes(chars, freqs, start, end) {
-        if (start === end) {
-            return;
-        }
-        if (end - start === 1) {
-            return;
-        }
-
-        // Encontrar punto de división
-        let totalFreq = 0;
-        for (let i = start; i <= end; i++) {
-            totalFreq += freqs[i];
-        }
-
-        let currentFreq = 0;
-        let splitIndex = start;
-        let minDiff = totalFreq;
-
-        for (let i = start; i <= end; i++) {
-            currentFreq += freqs[i];
-            let diff = Math.abs(totalFreq - 2 * currentFreq);
-            if (diff < minDiff) {
-                minDiff = diff;
-                splitIndex = i;
-            }
-        }
-
-        // Asignar códigos
-        for (let i = start; i <= end; i++) {
-            let currentCode = this.codes.get(chars[i]) || "";
-            this.codes.set(chars[i], currentCode + (i <= splitIndex ? "0" : "1"));
-        }
-
-        // Recursión
-        this.buildShannonFanoCodes(chars, freqs, start, splitIndex);
-        this.buildShannonFanoCodes(chars, freqs, splitIndex + 1, end);
-    }
-
-    compress(text) {
-        // Calcular frecuencias
-        const frequencies = new Map();
-        for (let char of text) {
-            frequencies.set(char, (frequencies.get(char) || 0) + 1);
-        }
-
-        const chars = Array.from(frequencies.keys());
-        const freqs = Array.from(frequencies.values());
-
-        // Construir códigos
-        this.buildShannonFanoCodes(chars, freqs, 0, chars.length - 1);
-
-        // Comprimir
-        let compressed = "";
-        for (let char of text) {
-            compressed += this.codes.get(char);
-        }
-
-        // Convertir a Buffer
-        const buffer = Buffer.alloc(Math.ceil(compressed.length / 8) + 1);
-        let currentByte = 0;
-        let bitCount = 0;
-
-        for (let i = 0; i < compressed.length; i++) {
-            currentByte = (currentByte << 1) | (compressed[i] === "1" ? 1 : 0);
-            bitCount++;
-
-            if (bitCount === 8) {
-                buffer[Math.floor(i / 8)] = currentByte;
-                currentByte = 0;
-                bitCount = 0;
-            }
-        }
-
-        if (bitCount > 0) {
-            currentByte = currentByte << (8 - bitCount);
-            buffer[Math.floor(compressed.length / 8)] = currentByte;
-        }
-
-        return {
-            data: buffer,
-            codes: this.codes
-        };
-    }
-
-    decompress(compressed, codes) {
-        let bits = "";
-        let decompressed = "";
-        const reverseMap = new Map();
-
-        // Crear mapa inverso
-        for (let [char, code] of codes) {
-            reverseMap.set(code, char);
-        }
-
-        // Convertir buffer a bits
-        for (let byte of compressed) {
-            bits += byte.toString(2).padStart(8, '0');
-        }
-
-        let currentCode = "";
-        for (let bit of bits) {
-            currentCode += bit;
-            if (reverseMap.has(currentCode)) {
-                decompressed += reverseMap.get(currentCode);
-                currentCode = "";
-            }
-        }
-
-        return decompressed;
-    }
-}
-
-// Implementación del algoritmo RLC
-class RLC {
-    compress(text) {
-        let compressed = [];
-        let count = 1;
-        let current = text[0];
-
-        for (let i = 1; i < text.length; i++) {
-            if (text[i] === current) {
-                count++;
-            } else {
-                compressed.push([current, count]);
-                current = text[i];
-                count = 1;
-            }
-        }
-        compressed.push([current, count]);
-
-        // Convertir a buffer
-        const buffer = Buffer.from(JSON.stringify(compressed));
         return buffer;
     }
 
-    decompress(compressed) {
-        const data = JSON.parse(compressed.toString());
-        let decompressed = "";
-        
-        for (let [char, count] of data) {
-            decompressed += char.repeat(count);
+    descomprimir(comprimido) {
+        //console.log(comprimido);
+        //obtenerArbol de comprimido
+        //const comprimido = fs.readFileSync(originalPath)
+        this.frequencies = new Map();
+        let cursor = 1;
+        for (cursor = 1; cursor < (comprimido[0] + 1) * 3; cursor += 3) {
+            // Guardar el carácter y su frecuencia en el Map
+            this.frequencies.set(comprimido[cursor], (comprimido[cursor + 1] << 8) + comprimido[cursor + 2]);
         }
+        console.log(this.frequencies);
+        let tree = this.construirArbolDeHuffman();
+        let actual = tree;//raiz del arbol
+        let decompressed = "";
+        let bytearray = [];
+        let bits = "";
+
+        // Convertir el buffer a una string de bits desde el cursor
+        while (cursor < comprimido.length) {
+            // Convertir cada byte a su representación en bits
+            const byte = comprimido[cursor];
+            bits += byte.toString(2).padStart(8, '0');
+            cursor++; // Mover el cursor al siguiente byte
+        }
+        //console.log(bits);
+        for (let bit of bits) {
+            if (bit === "0") {
+                actual = actual.left;
+            } else {
+                actual = actual.right;
+            }
+
+            if (actual.caracter !== null) {
+                decompressed += actual.caracter;
+                bytearray.push(actual.caracter);
+                actual = tree;
+            }
+        }
+        //console.log(decompressed);
+        bytearray = Buffer.from(bytearray);
+        //console.log(bytearray);
         
-        return decompressed;
+        return bytearray;
+    }
+    calculateEntropy() {
+        let totalSymbols = 0;
+        let entropy = 0;
+
+        // Calcular el número total de símbolos
+        this.frequencies.forEach((freq) => {
+            totalSymbols += freq;
+        });
+
+        // Calcular la entropía
+        this.frequencies.forEach((freq) => {
+            let probability = freq / totalSymbols;
+            entropy -= probability * Math.log2(probability);
+        });
+
+        return entropy;
+    }
+
+    // Método para calcular la longitud media
+    calculateMeanLength() {
+        let totalSymbols = 0;
+        let meanLength = 0;
+
+        // Calcular el número total de símbolos
+        this.frequencies.forEach((freq) => {
+            totalSymbols += freq;
+        });
+
+        // Calcular la longitud media ponderada por la probabilidad de cada símbolo
+        this.frequencies.forEach((freq, symbol) => {
+            let probability = freq / totalSymbols;
+            let code = this.tabla.get(symbol);  // Obtener el código (cadena de texto) para el símbolo
+            let codeLength = code.length;       // Longitud del código en bits (número de caracteres en la cadena)
+            meanLength += probability * codeLength;
+        });
+
+        return meanLength;
     }
 }
+
 
 // Función principal
 function main() {
     const args = process.argv.slice(2);
-    
+
     if (args.length !== 3) {
         console.error('Uso: tpi3 {-c|-d} original compressed');
         process.exit(1);
     }
 
     const [flag, originalPath, compressedPath] = args;
-    
+
+
     if (flag !== '-c' && flag !== '-d') {
         console.error('Flag inválido. Use -c para comprimir o -d para descomprimir');
         process.exit(1);
     }
 
     try {
+        
         const startTime = process.hrtime();
-
         if (flag === '-c') {
             // Comprimir
-            const text = fs.readFileSync(originalPath, 'utf8');
-            const originalSize = Buffer.from(text).length;
+            const text = fs.readFileSync(originalPath);
+            const originalSize = Buffer.from(text).length;//ya es un buffer nose si es necesario transformarlo
 
-            // Usar los tres algoritmos y elegir el mejor resultado
-            const huffman = new HuffmanCoding();
-            const shannonFano = new ShannonFano();
-            const rlc = new RLC();
+            const huffman = new Huffman();
 
-            const huffmanResult = huffman.compress(text);
-            const shannonResult = shannonFano.compress(text);
-            const rlcResult = rlc.compress(text);
+            const huffmanResult = huffman.comprimir(text);
 
-            // Comparar tamaños y elegir el mejor
-            const results = [
-                { name: 'Huffman', data: huffmanResult.data, meta: huffmanResult },
-                { name: 'Shannon-Fano', data: shannonResult.data, meta: shannonResult },
-                { name: 'RLC', data: rlcResult, meta: null }
-            ];
-
-            results.sort((a, b) => a.data.length - b.data.length);
-            const best = results[0];
-
-            // Guardar resultado comprimido con metadatos
-            const metadata = {
-                algorithm: best.name,
-                meta: best.meta
-            };
-
-            const finalBuffer = Buffer.concat([
-                Buffer.from(JSON.stringify(metadata)),
-                Buffer.from([0]), // separador
-                best.data
-            ]);
-
-            fs.writeFileSync(compressedPath, finalBuffer);
+            fs.writeFileSync(compressedPath, huffmanResult); 
 
             const endTime = process.hrtime(startTime);
-            const compressedSize = finalBuffer.length;
+            
+            const compressedSize = huffmanResult.length;
             const compressionRatio = originalSize / compressedSize;
-            const efficiency = Math.log2(compressionRatio);
-            const redundancy = 1 - efficiency;
 
-            console.log(`\nCompresión completada usando ${best.name}`);
-            console.log(`Tiempo: ${(endTime[0] * 1000 + endTime[1] / 1000000).toFixed(2)}ms`);
-            console.log(`Tasa de compresión: ${compressionRatio.toFixed(2)}:1`);
-            console.log(`Rendimiento: ${efficiency.toFixed(2)}`);
-            console.log(`Redundancia: ${redundancy.toFixed(2)}`);
+            //calcular entropia de huffman
+
+            const efficiency = huffman.calculateEntropy() / huffman.calculateMeanLength(); //Math.log2(compressionRatio);//
+            const redundancy = 1 - efficiency;
+            
+            console.log(`\nCompresión completada`);
+            console.log(`Tiempo: ${(endTime[0] * 1000 + endTime[1] / 1000000).toFixed(3)}ms`);
+            console.log(`Tasa de compresión: ${compressionRatio.toFixed(3)}:1`);
+            console.log(`Entropia: ${huffman.calculateEntropy().toFixed(3)}`);
+            console.log(`Longitud media: ${huffman.calculateMeanLength().toFixed(3)}`);
+            console.log(`Rendimiento: ${efficiency.toFixed(3)}`);
+            console.log(`Redundancia: ${redundancy.toFixed(3)}`);
 
         } else {
             // Descomprimir
             const compressed = fs.readFileSync(compressedPath);
-            
-            // Separar metadata y datos
-            const separatorIndex = compressed.indexOf(0);
-            const metadata = JSON.parse(compressed.slice(0, separatorIndex).toString());
-            const data = compressed.slice(separatorIndex + 1);
 
             let decompressed;
-            switch (metadata.algorithm) {
-                case 'Huffman':
-                    const huffman = new HuffmanCoding();
-                    decompressed = huffman.decompress(data, metadata.meta.tree);
-                    break;
-                case 'Shannon-Fano':
-                    const shannonFano = new ShannonFano();
-                    decompressed = shannonFano.decompress(data, metadata.meta.codes);
-                    break;
-                case 'RLC':
-                    const rlc = new RLC();
-                    decompressed = rlc.decompress(data);
-                    break;
-            }
+           
+            const huffman = new Huffman();
+            const startTime = process.hrtime();
+            decompressed = huffman.descomprimir(compressed);
 
-            fs.writeFileSync(originalPath, decompressed);
+            fs.writeFileSync("decompressedByte.bin"/*originalPath*/, decompressed);
 
             const endTime = process.hrtime(startTime);
-            console.log(`\nDescompresión completada usando ${metadata.algorithm}`);
+
             console.log(`Tiempo: ${(endTime[0] * 1000 + endTime[1] / 1000000).toFixed(2)}ms`);
         }
 
