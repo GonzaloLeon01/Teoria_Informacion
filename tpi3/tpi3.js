@@ -15,10 +15,8 @@ class Nodo {
 class Huffman {
 
     constructor() {
-        //metadatos
         this.tabla = new Map();
         this.frequencies = new Map();
-        //entropia
     }
     construirArbolDeHuffman() {
 
@@ -26,11 +24,6 @@ class Huffman {
         const nodosHuffman = Array.from(this.frequencies.entries()).map(
             ([char, frecuencia]) => new Nodo(char, frecuencia)
         );
-        //////////////////////////////////////
-        ////muestra
-/*        nodosHuffman.sort((a, b) => b.frecuencia - a.frecuencia);//borrar
-        console.log(nodosHuffman);*/
-        //////////////////////////////////////
 
         // Construir árbol
         while (nodosHuffman.length > 1) {//por alguna razon lo hace mal
@@ -46,15 +39,7 @@ class Huffman {
         // Generar códigos
         this.generarCodigos(nodosHuffman[0], "");
 
-        //////////////////////////////////////////////
         let tablaOrdenada = Array.from(this.tabla).sort((a, b) => a[1].length - b[1].length);
-
-        // Mostrar los elementos ordenados por la longitud del código
-/*        console.log("Contenido de la tabla ordenada por longitud del código:");
-        tablaOrdenada.forEach(([char, code], index) => {
-            console.log(` Caracter = ${char}, Código = ${code}, Longitud = ${code.length}`);
-        });*/
-        //////////////////////////////////////////////d
 
         return nodosHuffman[0];
     }
@@ -68,8 +53,6 @@ class Huffman {
             this.generarCodigos(node.left, codigo + "0");
             this.generarCodigos(node.right, codigo + "1");
         }
-
-
     }
 
     comprimir(arch) {
@@ -119,8 +102,6 @@ class Huffman {
             buffer[1] = (8 - bitCount);//bits a ignorar en la descompresion
         }
 
-        //console.log(buffer);
-
         return buffer;
     }
 
@@ -133,7 +114,6 @@ class Huffman {
             // Guardar el carácter y su frecuencia en el Map
             this.frequencies.set(comprimido[cursor], (comprimido[cursor + 1] << 8) + comprimido[cursor + 2]);
         }
-        //console.log(this.frequencies);
         let tree = this.construirArbolDeHuffman();
         let actual = tree;//raiz del arbol
         let decompressed = "";
@@ -246,7 +226,7 @@ function main() {
         if (flag1 === "-c") {
             // Comprimir
             const text = fs.readFileSync(original);
-            const originalSize = Buffer.from(text).length; //ya es un buffer nose si es necesario transformarlo
+            const originalSize = text.length;
 
             const huffman = new Huffman();
 
@@ -262,18 +242,19 @@ function main() {
             //calcular entropia de huffman
             const entropia = huffman.calcularEntropia();
             const longitudMedia = huffman.calcularLongitudMedia();
-            const efficiency = entropia / longitudMedia; //Math.log2(compressionRatio);//
+            const efficiency = entropia / longitudMedia;
             const redundancy = 1 - efficiency;
 
             console.log(`\nCompresión completada Escrito en: ${compressed}`);
             console.log(`Tiempo: ${(endTime[0] * 1000 + endTime[1] / 1000000).toFixed(3)}ms`);
             console.log(`Tasa de compresión: ${compressionRatio.toFixed(3)}:1`);
+            console.log(`Rendimiento: ${efficiency.toFixed(3)}`);
+            console.log(`Redundancia: ${redundancy.toFixed(3)}`);
+            console.log('\x1b[32mExtra: \x1b[0m');
             console.log("Entropia Maxima: ", Math.log2(huffman.frequencies.size));
             console.log("Razon Entropia(a menor entropia es mas comprimible): ", entropia / Math.log2(huffman.frequencies.size));
             console.log(`Entropia: ${entropia.toFixed(3)}`);
             console.log(`Longitud media: ${longitudMedia.toFixed(3)}`);
-            console.log(`Rendimiento: ${efficiency.toFixed(3)}`);
-            console.log(`Redundancia: ${redundancy.toFixed(3)}`);
         }
         if (flag2 === "-d" || flag1 === "-d") {
             const originalFile = original;
