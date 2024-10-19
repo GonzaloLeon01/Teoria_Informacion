@@ -268,7 +268,7 @@ function main() {
             // Descomprimir
             const compressedRead = fs.readFileSync(compressed);
 
-            let decompressed;
+            var decompressed;
 
             const huffman = new Huffman();
             const startTime = process.hrtime();
@@ -281,11 +281,34 @@ function main() {
             console.log(
                 `Tiempo: ${(endTime[0] * 1000 + endTime[1] / 1000000).toFixed(2)}ms`
             );
+            if(flag1 === "-d"){
+
+                const compressionRatio = decompressed.length / compressedRead.length;
+    
+                //calcular entropia de huffman
+                const entropia = huffman.calcularEntropia();
+                const longitudMedia = huffman.calcularLongitudMedia();
+                const efficiency = entropia / longitudMedia;
+                const redundancy = 1 - efficiency;
+    
+                console.log(`\nCompresión completada Escrito en: ${compressed}`);
+                console.log(`Tiempo: ${(endTime[0] * 1000 + endTime[1] / 1000000).toFixed(3)}ms`);
+                console.log(`Tasa de compresión: ${compressionRatio.toFixed(3)}:1`);
+                console.log(`Rendimiento: ${efficiency.toFixed(3)}`);
+                console.log(`Redundancia: ${redundancy.toFixed(3)}`);
+                console.log('\x1b[32mExtra: \x1b[0m');
+                console.log("Entropia Maxima: ", Math.log2(huffman.frequencies.size));
+                console.log("Razon Entropia(a menor entropia es mas comprimible): ", entropia / Math.log2(huffman.frequencies.size));
+                console.log(`Entropia: ${entropia.toFixed(3)}`);
+                console.log(`Longitud media: ${longitudMedia.toFixed(3)}`);
+            }
         }
     } catch (error) {
         console.error("Error:", error.message);
         process.exit(1);
     }
 }
+
+
 
 main();
