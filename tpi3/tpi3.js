@@ -38,9 +38,6 @@ class Huffman {
 
         // Generar códigos
         this.generarCodigos(nodosHuffman[0], "");
-
-        let tablaOrdenada = Array.from(this.tabla).sort((a, b) => a[1].length - b[1].length);
-
         return nodosHuffman[0];
     }
 
@@ -74,7 +71,7 @@ class Huffman {
 
         //agregar cabecera a la tabla (cantidad de pares, caracter, frecuencia)
         var index = 2;
-        buffer[0] = (this.frequencies.size > 0xFF) ? 0xFF : this.frequencies.size;//almacena el número de caracteres únicos en el archivo
+        buffer[0] = this.frequencies.size-1;//almacena el número de caracteres únicos en el archivo
         buffer[1] = 0;//bits a ignorar en la descompresion
         for (let [char, frec] of this.frequencies) {
             buffer[index] = char;
@@ -110,7 +107,9 @@ class Huffman {
         //obtenerArbol de comprimido
         this.frequencies = new Map();
         let cursor;
-        for (cursor = 2; cursor < comprimido[0] * 3; cursor += 3) {
+
+        let headerEnd = (comprimido[0]+1)* 3;
+        for (cursor = 2; cursor < headerEnd; cursor += 3) {
             // Guardar el carácter y su frecuencia en el Map
             this.frequencies.set(comprimido[cursor], (comprimido[cursor + 1] << 8) + comprimido[cursor + 2]);
         }
@@ -128,7 +127,7 @@ class Huffman {
             cursor++; // Mover el cursor al siguiente byte
         }
 
-        bits = bits.slice(0, -comprimido[1]);//ignora los ultimos bits que sobraron de la compresion
+        bits = (comprimido[1]>0)?bits.slice(0, -comprimido[1]):bits;//ignora los ultimos bits que sobraron de la compresion
 
         for (let bit of bits) {
             if (bit === "0") {
