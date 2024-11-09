@@ -28,7 +28,7 @@ function main() {
     printChannelMatrix(channelMatrix);
 
     // Analizar mensajes
-    const messageAnalysis = analyzeMessages(sentMatrices, receivedMatrices, N);
+    const messageAnalysis = analyzeReceivedMessages(sentMatrices, receivedMatrices, N);
     printMessageAnalysis(messageAnalysis);
 
     // Calcular métricas
