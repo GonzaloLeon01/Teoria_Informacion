@@ -1,8 +1,6 @@
 const fs = require('fs');
 
-// Función principal que maneja la ejecución del programa
 function main() {
-    // Verificar argumentos de línea de comandos
     if (process.argv.length !== 5) {
         console.log('Uso: node tpi4.js sent received N');
         process.exit(1);
@@ -12,68 +10,48 @@ function main() {
     const receivedFile = process.argv[3];
     const N = parseInt(process.argv[4]);
 
-    // Leer archivos binarios
     const sentData = fs.readFileSync(sentFile);
     const receivedData = fs.readFileSync(receivedFile);
 
-    // 1. Calcular entropía de la fuente binaria
     const sentEntropy = calculateEntropy(sentData);
     console.log('\n1. Entropía de la fuente binaria:', sentEntropy.toFixed(4), 'bits');
 
-    // 2. Aplicar paridad cruzada
-    const { matrices, parityCodes } = applyCrossParityToData(sentData, N);
+    // Crear matrices para datos enviados (calculando bits de paridad)
+    const sentMatrices = createParityMatrices(sentData, N);
+    
+    // Cargar matrices para datos recibidos (con bits de paridad incluidos)
+    const receivedMatrices = loadReceivedMatrices(receivedData, N);
 
-    // 3. Estimar matriz de probabilidades del canal
-    const channelMatrix = estimateChannelMatrix(parityCodes, receivedData);
+    // Estimar matriz de probabilidades del canal
+    const channelMatrix = estimateChannelMatrix(sentMatrices, receivedMatrices);
     console.log('\n3. Matriz de probabilidades del canal:');
     printChannelMatrix(channelMatrix);
 
-    // 4. Analizar mensajes
-    const messageAnalysis = analyzeMessages(matrices, parityCodes, receivedData, N);
+    // Analizar mensajes
+    const messageAnalysis = analyzeMessages(sentMatrices, receivedMatrices, N);
     printMessageAnalysis(messageAnalysis);
 
-    // 5. Calcular entropías y métricas relacionadas
+    // Calcular métricas
     const metrics = calculateChannelMetrics(channelMatrix, sentEntropy);
     printMetrics(metrics);
 }
 
-// Función para calcular la entropía
-function calculateEntropy(data) {
-    const frequencies = new Map();
-    const totalBits = data.length * 8;
-
-    // Contar frecuencias de 0s y 1s
-    for (let byte of data) {
-        for (let i = 0; i < 8; i++) {
-            const bit = (byte >> i) & 1;
-            frequencies.set(bit, (frequencies.get(bit) || 0) + 1);
-        }
-    }
-
-    // Calcular entropía
-    let entropy = 0;
-    for (let [_, freq] of frequencies) {
-        const probability = freq / totalBits;
-        entropy -= probability * Math.log2(probability);
-    }
-
-    return entropy;
-}
-
-// Función para aplicar paridad cruzada
-function applyCrossParityToData(data, N) {
+/*
+Cargar las matrices de sentFile y receivedFile
+*/
+//Matrices del mensaje enviado
+function createParityMatrices(data, N) {
     const matrices = [];
-    const parityCodes = [];
     const totalBits = data.length * 8;
     const matrixSize = N * N;
     const totalMatrices = Math.ceil(totalBits / matrixSize);
 
     let bitIndex = 0;
     for (let m = 0; m < totalMatrices; m++) {
-        // Crear matriz NxN
-        const matrix = Array(N).fill().map(() => Array(N).fill(0));
+        // Crear matriz (N+1)x(N+1) inicializada con ceros
+        const matrix = Array(N + 1).fill().map(() => Array(N + 1).fill(0));
         
-        // Llenar matriz con bits
+        // Llenar la matriz NxN con los bits de datos
         for (let i = 0; i < N; i++) {
             for (let j = 0; j < N; j++) {
                 if (bitIndex < totalBits) {
@@ -85,42 +63,69 @@ function applyCrossParityToData(data, N) {
             }
         }
 
-        // Calcular paridades
-        const parityCode = calculateParityCode(matrix, N);
-        
-        matrices.push(matrix);
-        parityCodes.push(parityCode);
-    }
-
-    return { matrices, parityCodes };
-}
-
-// Función para calcular código de paridad de una matriz
-function calculateParityCode(matrix, N) {
-    const parityCode = {
-        rows: Array(N).fill(0),
-        cols: Array(N).fill(0),
-        total: 0
-    };
-
-    // Calcular paridades de filas y columnas
-    for (let i = 0; i < N; i++) {
-        for (let j = 0; j < N; j++) {
-            parityCode.rows[i] ^= matrix[i][j];
-            parityCode.cols[j] ^= matrix[i][j];
+        // Calcular bits de paridad de filas (última columna)
+        for (let i = 0; i < N; i++) {
+            let rowParity = matrix[i][0];
+            for (let j = 1; j < N; j++) {
+                rowParity ^= matrix[i][j];
+            }
+            matrix[i][N] = rowParity;
         }
+
+        // Calcular bits de paridad de columnas (última fila)
+        for (let j = 0; j < N; j++) {
+            let colParity = matrix[0][j];
+            for (let i = 1; i < N; i++) {
+                colParity ^= matrix[i][j];
+            }
+            matrix[N][j] = colParity;
+        }
+
+        // Calcular bit de paridad total (esquina inferior derecha: A.K.A: ultimo elemento)
+        let totalParity = matrix[0][N];
+        // XOR de los bits de paridad de filas
+        for (let i = 1; i < N; i++) {
+            totalParity ^= matrix[i][N];
+        }
+        matrix[N][N] = totalParity;
+
+        matrices.push(matrix);
     }
 
-    // Calcular paridad total
-    for (let i = 0; i < N; i++) {
-        parityCode.total ^= parityCode.rows[i];
-    }
-
-    return parityCode;
+    return matrices;
 }
+//Matrices de archivo recibido
+function loadReceivedMatrices(data, N) {
+    const matrices = [];
+    const bitsPerMatrix = (N+1)**2; // N+1 filas con N+1 bits cada una
+    const totalBits = data.length * 8;
+    const totalMatrices = Math.floor(totalBits / bitsPerMatrix);
 
-// Función para estimar la matriz de probabilidades del canal
-function estimateChannelMatrix(parityCodes, receivedData) {
+    let bitIndex = 0;
+    for (let m = 0; m < totalMatrices; m++) {
+        // Crear matriz (N+1)x(N+1)
+        const matrix = Array(N + 1).fill().map(() => Array(N + 1).fill(0));
+        
+        // Leer N+1 filas, cada una con N+1 bits (N bits de datos + 1 bit de paridad, ultima fila = bits de paridad)
+        for (let i = 0; i <= N; i++) {
+            // Leer N bits de datos + 1 bit de paridad para cada fila
+            for (let j = 0; j <= N; j++) {
+                if (bitIndex < totalBits) {
+                    const byteIndex = Math.floor(bitIndex / 8);
+                    const bit = (data[byteIndex] >> (bitIndex % 8)) & 1;
+                    matrix[i][j] = bit;
+                }
+                bitIndex++;
+            }
+        }
+
+        matrices.push(matrix);
+    }
+
+    return matrices;
+}
+//Matriz del canal
+function estimateChannelMatrix(sentMatrices, receivedMatrices) {
     const transitions = {
         '0->0': 0,
         '0->1': 0,
@@ -129,18 +134,21 @@ function estimateChannelMatrix(parityCodes, receivedData) {
     };
     
     let totalBits = 0;
-    let receivedBitIndex = 0;
 
-    // Contar transiciones
-    for (let code of parityCodes) {
-        for (let i = 0; i < code.rows.length; i++) {
-            const sentBit = code.rows[i];
-            const receivedBit = (receivedData[Math.floor(receivedBitIndex/8)] >> (receivedBitIndex % 8)) & 1;
-            
-            const key = `${sentBit}->${receivedBit}`;
-            transitions[key]++;
-            totalBits++;
-            receivedBitIndex++;
+    // Comparar solo los bits de datos (no los de paridad)
+    const minMatrices = Math.min(sentMatrices.length, receivedMatrices.length);
+    for (let m = 0; m < minMatrices; m++) {
+        const N = sentMatrices[m].length - 1; // Tamaño real de la matriz de datos
+        
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+                const sentBit = sentMatrices[m][i][j];
+                const receivedBit = receivedMatrices[m][i][j];
+                
+                const key = `${sentBit}->${receivedBit}`;
+                transitions[key]++;
+                totalBits++;
+            }
         }
     }
 
@@ -153,59 +161,129 @@ function estimateChannelMatrix(parityCodes, receivedData) {
     return channelMatrix;
 }
 
-// Función para analizar mensajes
-function analyzeMessages(matrices, parityCodes, receivedData, N) {
+/*
+Calculo de matrices recibidas correctas
+*/
+//Funcion analizadora
+function analyzeReceivedMessages(matrices, N) {
     let correct = 0;
     let errors = 0;
     let corrected = 0;
+    let errorDetails = [];
 
-    let receivedBitIndex = 0;
-    
-    for (let i = 0; i < matrices.length; i++) {
-        const receivedMatrix = Array(N).fill().map(() => Array(N).fill(0));
-        
-        // Reconstruir matriz recibida
-        for (let row = 0; row < N; row++) {
-            for (let col = 0; col < N; col++) {
-                if (receivedBitIndex < receivedData.length * 8) {
-                    receivedMatrix[row][col] = 
-                        (receivedData[Math.floor(receivedBitIndex/8)] >> (receivedBitIndex % 8)) & 1;
-                    receivedBitIndex++;
-                }
-            }
-        }
+    for (let m = 0; m < matrices.length; m++) {
+        const matrix = matrices[m];
+        const result = checkMatrixParity(matrix, N);
 
-        const receivedParityCode = calculateParityCode(receivedMatrix, N);
-        
-        if (compareParityCodes(parityCodes[i], receivedParityCode)) {
+        if (result.isCorrect) {
             correct++;
         } else {
-            const canCorrect = attemptCorrection(receivedMatrix, parityCodes[i], N);
-            if (canCorrect) {
+            if (result.isCorrectible) {
                 corrected++;
+                // Corregir el error invirtiendo el bit en la posición identificada
+                matrix[result.errorPosition.i][result.errorPosition.j] ^= 1;
+                
+                errorDetails.push({
+                    matrix: m,
+                    type: 'corrected',
+                    position: result.errorPosition,
+                    message: `Error corregido en matriz ${m} en posición (${result.errorPosition.i},${result.errorPosition.j})`
+                });
             } else {
                 errors++;
+                errorDetails.push({
+                    matrix: m,
+                    type: 'uncorrectable',
+                    errorPairs: result.errorPairs,
+                    message: `Error no corregible en matriz ${m} - múltiples errores detectados`
+                });
             }
         }
     }
 
-    return { correct, errors, corrected };
+    return { 
+        correct, 
+        errors, 
+        corrected,
+        errorDetails,
+        totalMatrices: matrices.length
+    };
+}
+//Verifica si la matriz es correcta, si tiene un error (y si este es reparable), si tiene muchos errores y no es reparable
+function checkMatrixParity(matrix, N) {
+    let errorRows = [];
+    let errorCols = [];
+
+    // Verificar paridad de filas
+    for (let i = 0; i < N; i++) {
+        let rowXOR = matrix[i][0];
+        // XOR de todos los bits de la fila incluyendo el bit de paridad
+        for (let j = 1; j <= N; j++) {
+            rowXOR ^= matrix[i][j];
+        }
+        if (rowXOR !== 0) {
+            errorRows.push(i);
+        }
+    }
+
+    // Verificar paridad de columnas
+    for (let j = 0; j < N; j++) {
+        let colXOR = matrix[0][j];
+        // XOR de todos los bits de la columna incluyendo el bit de paridad
+        for (let i = 1; i <= N; i++) {
+            colXOR ^= matrix[i][j];
+        }
+        if (colXOR !== 0) {
+            errorCols.push(j);
+        }
+    }
+
+    // Si no hay errores
+    if (errorRows.length === 0 && errorCols.length === 0) {
+        return {
+            isCorrect: true,
+            isCorrectible: false
+        };
+    }
+
+    // Si hay exactamente un error (un par i,j)
+    if (errorRows.length === 1 && errorCols.length === 1) {
+        return {
+            isCorrect: false,
+            isCorrectible: true,
+            errorPosition: {
+                i: errorRows[0],
+                j: errorCols[0]
+            }
+        };
+    }
+
+    // Si hay múltiples errores
+    return {
+        isCorrect: false,
+        isCorrectible: false,
+        errorPairs: errorRows.map(row => 
+            errorCols.map(col => ({i: row, j: col}))
+        ).flat()
+    };
 }
 
-// Función para comparar códigos de paridad
-function compareParityCodes(code1, code2) {
-    return code1.total === code2.total &&
-           code1.rows.every((val, idx) => val === code2.rows[idx]) &&
-           code1.cols.every((val, idx) => val === code2.cols[idx]);
+function printMessageAnalysis(analysis) {
+    console.log('\nAnálisis de mensajes:');
+    console.log(`Total de matrices analizadas: ${analysis.totalMatrices}`);
+    console.log(`- Matrices correctas: ${analysis.correct}`);
+    console.log(`- Matrices con errores no corregibles: ${analysis.errors}`);
+    console.log(`- Matrices corregidas: ${analysis.corrected}`);
+    
+    console.log('\nDetalles de errores:');
+    analysis.errorDetails.forEach(detail => {
+        console.log(detail.message);
+    });
 }
 
-// Función para intentar corregir errores
-function attemptCorrection(matrix, originalParityCode, N) {
-    // Implementación simple de corrección de errores
-    // En un caso real, se implementaría un algoritmo más sofisticado
-    return false;
-}
-
+/*
+ Calculos del ultimo punto
+ */
 // Función para calcular métricas del canal
 function calculateChannelMetrics(channelMatrix, prioriEntropy) {
     const posterioriEntropy = calculatePosterioriEntropy(channelMatrix);
