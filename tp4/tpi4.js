@@ -118,7 +118,6 @@ function loadReceivedMatrices(data, N) {
                 bitIndex++;
             }
         }
-
         matrices.push(matrix);
     }
 
@@ -268,18 +267,6 @@ function checkMatrixParity(matrix, N) {
     };
 }
 
-function printMessageAnalysis(analysis) {
-    console.log('\nAnálisis de mensajes:');
-    console.log(`Total de matrices analizadas: ${analysis.totalMatrices}`);
-    console.log(`- Matrices correctas: ${analysis.correct}`);
-    console.log(`- Matrices con errores no corregibles: ${analysis.errors}`);
-    console.log(`- Matrices corregidas: ${analysis.corrected}`);
-    
-    console.log('\nDetalles de errores:');
-    analysis.errorDetails.forEach(detail => {
-        console.log(detail.message);
-    });
-}
 
 /*
  Calculos del ultimo punto
@@ -336,11 +323,18 @@ function printChannelMatrix(matrix) {
 }
 
 function printMessageAnalysis(analysis) {
-    console.log('\n4. Análisis de mensajes:');
-    console.log(`- Mensajes correctos: ${analysis.correct}`);
-    console.log(`- Mensajes con errores: ${analysis.errors}`);
-    console.log(`- Mensajes corregidos: ${analysis.corrected}`);
+    console.log('\nAnálisis de mensajes:');
+    console.log(`Total de matrices analizadas: ${analysis.totalMatrices}`);
+    console.log(`- Matrices correctas: ${analysis.correct}`);
+    console.log(`- Matrices con errores no corregibles: ${analysis.errors}`);
+    console.log(`- Matrices corregidas: ${analysis.corrected}`);
+    
+    console.log('\nDetalles de errores:');
+    analysis.errorDetails.forEach(detail => {
+        console.log(detail.message);
+    });
 }
+
 
 function printMetrics(metrics) {
     console.log('\n5. Métricas del canal:');
