@@ -269,8 +269,31 @@ function checkMatrixParity(matrix, N) {
 
 
 /*
- Calculos del ultimo punto
+ Calculos
  */
+// Función para calcular la entropía de una fuente binaria
+function calculateEntropy(data) {
+    const frequencies = new Map();
+    const totalBits = data.length * 8;  // Total de bits en el archivo
+
+    // Contar las frecuencias de 0s y 1s en el archivo
+    for (let byte of data) {
+        for (let i = 0; i < 8; i++) {
+            const bit = (byte >> i) & 1;
+            frequencies.set(bit, (frequencies.get(bit) || 0) + 1);
+        }
+    }
+
+    // Calcular la entropía usando la fórmula de Shannon
+    let entropy = 0;
+    for (let [_, freq] of frequencies) {
+        const probability = freq / totalBits;
+        entropy -= probability * Math.log2(probability);
+    }
+
+    return entropy;
+}
+
 // Función para calcular métricas del canal
 function calculateChannelMetrics(channelMatrix, prioriEntropy) {
     const posterioriEntropy = calculatePosterioriEntropy(channelMatrix);
