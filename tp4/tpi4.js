@@ -45,7 +45,7 @@ function createParityMatrices(data, N) {
     const totalBits = data.length * 8;
     const matrixSize = N * N;
     const totalMatrices = Math.ceil(totalBits / matrixSize);
-
+    console.log(`${data}  ${totalBits} ${matrixSize} ${totalMatrices}`);
     let bitIndex = 0;
     for (let m = 0; m < totalMatrices; m++) {
         // Crear matriz (N+1)x(N+1) inicializada con ceros
@@ -62,7 +62,7 @@ function createParityMatrices(data, N) {
                 bitIndex++;
             }
         }
-
+        console.log(`${matrix}`);
         // Calcular bits de paridad de filas (última columna)
         for (let i = 0; i < N; i++) {
             let rowParity = matrix[i][0];
@@ -71,7 +71,7 @@ function createParityMatrices(data, N) {
             }
             matrix[i][N] = rowParity;
         }
-
+        console.log(`${matrix}`);
         // Calcular bits de paridad de columnas (última fila)
         for (let j = 0; j < N; j++) {
             let colParity = matrix[0][j];
@@ -80,7 +80,7 @@ function createParityMatrices(data, N) {
             }
             matrix[N][j] = colParity;
         }
-
+        console.log(`${matrix}`);
         // Calcular bit de paridad total (esquina inferior derecha: A.K.A: ultimo elemento)
         let totalParity = matrix[0][N];
         // XOR de los bits de paridad de filas
@@ -88,7 +88,7 @@ function createParityMatrices(data, N) {
             totalParity ^= matrix[i][N];
         }
         matrix[N][N] = totalParity;
-
+        console.log(`${matrix}`);
         matrices.push(matrix);
     }
 
