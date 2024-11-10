@@ -1,10 +1,11 @@
 const fs = require('fs');
 
 function binaryStringToFile(binaryString, fileName) {
-    // Asegúrate de que la cadena de texto tenga un número de bits múltiplo de 8
+    // Asegúrate de que la cadena binaria tenga un número de bits múltiplo de 8
     if (binaryString.length % 8 !== 0) {
-        console.error('La longitud de la cadena binaria debe ser un múltiplo de 8');
-        return;
+        const padding = 8 - (binaryString.length % 8);
+        binaryString = binaryString.padEnd(binaryString.length + padding, '0'); // Rellena con ceros al final
+        console.log(`Cadena binaria rellenada con ${padding} ceros.`);
     }
 
     const buffer = Buffer.alloc(binaryString.length / 8);  // Crea un buffer de tamaño adecuado
@@ -26,7 +27,7 @@ function binaryStringToFile(binaryString, fileName) {
 }
 
 // Ejemplo de uso
-const binaryString = "1100101110100111"; // La cadena binaria de entrada
-const fileName = "output.bin"; // El nombre del archivo binario de salida
+const binaryString = "1100010111101000111110100"; // La cadena binaria de entrada
+const fileName = "outputR.bin"; // El nombre del archivo binario de salida
 
 binaryStringToFile(binaryString, fileName);

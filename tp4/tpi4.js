@@ -129,27 +129,51 @@ function createParityMatrices(data, N) {
 }
 //Matrices de archivo recibido
 function loadReceivedMatrices(data, N) {
+    let binaryString = '';
+
+    // Convertir cada byte a su representación binaria y concatenarlo a la cadena
+    for (let byte of data) {
+        // Usar `toString(2)` para convertir a binario, y luego rellenar con ceros a la izquierda si es necesario
+        binaryString += byte.toString(2).padStart(8, '0');
+    }
+    console.log("data binaria ", binaryString);
+
+
+
     const matrices = [];
     const bitsPerMatrix = (N + 1) ** 2; // N+1 filas con N+1 bits cada una
     const totalBits = data.length * 8;
     const totalMatrices = Math.floor(totalBits / bitsPerMatrix);
-
+    console.log(`${data}  ${bitsPerMatrix} ${totalBits} ${totalMatrices}`);
     let bitIndex = 0;
     for (let m = 0; m < totalMatrices; m++) {
         // Crear matriz (N+1)x(N+1)
         const matrix = Array(N + 1).fill().map(() => Array(N + 1).fill(0));
-
+        console.log("Matriz N x N ceros:");
+        for (let row of matrix) {
+            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
+        }
         // Leer N+1 filas, cada una con N+1 bits (N bits de datos + 1 bit de paridad, ultima fila = bits de paridad)
         for (let i = 0; i <= N; i++) {
-            // Leer N bits de datos + 1 bit de paridad para cada fila
             for (let j = 0; j <= N; j++) {
                 if (bitIndex < totalBits) {
+                    // Calcular el índice del byte
                     const byteIndex = Math.floor(bitIndex / 8);
-                    const bit = (data[byteIndex] >> (bitIndex % 8)) & 1;
+
+                    // Obtener el bit en la posición 'bitIndex' sin desplazamientos complejos
+                    const bit = (data[byteIndex] & (1 << (7 - (bitIndex % 8)))) !== 0 ? 1 : 0;
+
+                    // Asignar el bit a la matriz
                     matrix[i][j] = bit;
                 }
                 bitIndex++;
             }
+
+        }
+
+        console.log("Matriz N x N recreada:");
+        for (let row of matrix) {
+            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
         }
         matrices.push(matrix);
     }
