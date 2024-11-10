@@ -145,11 +145,15 @@ function loadReceivedMatrices(data, N) {
             for (let j = 0; j <= N; j++) {
                 if (bitIndex < totalBits) {
                     const byteIndex = Math.floor(bitIndex / 8);
-                    const bit = (data[byteIndex] >> (bitIndex % 8)) & 1;
+                    const bit = (data[byteIndex] & (1 << (7 - (bitIndex % 8)))) !== 0 ? 1 : 0;
                     matrix[i][j] = bit;
                 }
                 bitIndex++;
             }
+        }
+        console.log("Matriz N x N con bits de datos pero recived:");
+        for (let row of matrix) {
+            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
         }
         matrices.push(matrix);
     }
@@ -165,29 +169,34 @@ function estimateChannelMatrix(sentMatrices, receivedMatrices) {
         '1->1': 0
     };
 
-    let totalBits = 0;
+    let totalBitsDown = 0;
+    let totalBitsUp = 0;
 
     // Comparar solo los bits de datos (no los de paridad)
     const minMatrices = Math.min(sentMatrices.length, receivedMatrices.length);
     for (let m = 0; m < minMatrices; m++) {
         const N = sentMatrices[m].length - 1; // Tamaño real de la matriz de datos
-
         for (let i = 0; i < N; i++) {
             for (let j = 0; j < N; j++) {
                 const sentBit = sentMatrices[m][i][j];
                 const receivedBit = receivedMatrices[m][i][j];
-
+                console.log('recived:'+receivedBit+' sent:'+sentBit);
                 const key = `${sentBit}->${receivedBit}`;
                 transitions[key]++;
-                totalBits++;
+                if(key=='0->0' || key=='0->1'){
+                    totalBitsUp++;    
+                }
+                else{
+                    totalBitsDown++;     
+                }
             }
         }
     }
-
+    console.log(transitions);
     // Calcular probabilidades
     const channelMatrix = [
-        [transitions['0->0'] / totalBits, transitions['0->1'] / totalBits],
-        [transitions['1->0'] / totalBits, transitions['1->1'] / totalBits]
+        [transitions['0->0'] / totalBitsUp, transitions['0->1'] / totalBitsUp],
+        [transitions['1->0'] / totalBitsDown, transitions['1->1'] / totalBitsDown]
     ];
 
     return channelMatrix;

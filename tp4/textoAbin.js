@@ -26,7 +26,7 @@ function binaryStringToFile(binaryString, fileName) {
 }
 
 // Ejemplo de uso
-const binaryString = "1100101110100111"; // La cadena binaria de entrada
-const fileName = "output.bin"; // El nombre del archivo binario de salida
+const binaryString = "11010101011011001110101010000000"; // La cadena binaria de entrada
+const fileName = "recibed.bin"; // El nombre del archivo binario de salida
 
 binaryStringToFile(binaryString, fileName);
