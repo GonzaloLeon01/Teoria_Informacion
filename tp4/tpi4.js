@@ -14,7 +14,7 @@ function main() {
     const receivedData = fs.readFileSync(receivedFile);
 
     const sentEntropy = calculateEntropy(sentData);
-    console.log('\n1. Entropía de la fuente binaria:', sentEntropy.toFixed(4), 'bits');
+    console.log('\na. Entropía de la fuente binaria:', sentEntropy.toFixed(4), 'bits');
 
     // Crear matrices para datos enviados (calculando bits de paridad)
     const sentMatrices = createParityMatrices(sentData, N);
@@ -24,7 +24,7 @@ function main() {
 
     // Estimar matriz de probabilidades del canal
     const channelMatrix = estimateChannelMatrix(sentMatrices, receivedMatrices);
-    console.log('\n3. Matriz de probabilidades del canal:');
+    console.log('\nc. Matriz de probabilidades del canal:');
     printChannelMatrix(channelMatrix);
 
     // Analizar mensajes
@@ -67,7 +67,7 @@ function createParityMatrices(data, N) {
         for (let i = 0; i < N; i++) {
             let rowParity = matrix[i][0];
             for (let j = 1; j < N; j++) {
-                rowParity ^= matrix[i][j];
+                rowParity ^= matrix[i][j];  //XOR
             }
             matrix[i][N] = rowParity;
         }
@@ -167,8 +167,7 @@ Calculo de matrices recibidas correctas
 function analyzeReceivedMessages(matrices, N) {
     let correct = 0;
     let errors = 0;
-    let corrected = 0;
-    let errorDetails = [];
+    let corregible=0;
 
     for (let m = 0; m < matrices.length; m++) {
         const matrix = matrices[m];
@@ -176,35 +175,20 @@ function analyzeReceivedMessages(matrices, N) {
 
         if (result.isCorrect) {
             correct++;
-        } else {
-            if (result.isCorrectible) {
-                corrected++;
-                // Corregir el error invirtiendo el bit en la posición identificada
-                matrix[result.errorPosition.i][result.errorPosition.j] ^= 1;
-                
-                errorDetails.push({
-                    matrix: m,
-                    type: 'corrected',
-                    position: result.errorPosition,
-                    message: `Error corregido en matriz ${m} en posición (${result.errorPosition.i},${result.errorPosition.j})`
-                });
-            } else {
-                errors++;
-                errorDetails.push({
-                    matrix: m,
-                    type: 'uncorrectable',
-                    errorPairs: result.errorPairs,
-                    message: `Error no corregible en matriz ${m} - múltiples errores detectados`
-                });
-            }
+        }
+        else if (result.isCorrectible){
+            corregible++;
+            errors++;
+        }
+        else{
+            errors++;    
         }
     }
 
     return { 
         correct, 
         errors, 
-        corrected,
-        errorDetails,
+        corregible,
         totalMatrices: matrices.length
     };
 }
@@ -250,20 +234,13 @@ function checkMatrixParity(matrix, N) {
         return {
             isCorrect: false,
             isCorrectible: true,
-            errorPosition: {
-                i: errorRows[0],
-                j: errorCols[0]
-            }
         };
     }
 
-    // Si hay múltiples errores
+    // Si hay multiples errores
     return {
         isCorrect: false,
         isCorrectible: false,
-        errorPairs: errorRows.map(row => 
-            errorCols.map(col => ({i: row, j: col}))
-        ).flat()
     };
 }
 
@@ -271,11 +248,11 @@ function checkMatrixParity(matrix, N) {
 /*
  Calculos
  */
-// Función para calcular la entropía de una fuente binaria
+
+// Funcion para calcular la entropia de una fuente binaria
 function calculateEntropy(data) {
     const frequencies = new Map();
     const totalBits = data.length * 8;  // Total de bits en el archivo
-
     // Contar las frecuencias de 0s y 1s en el archivo
     for (let byte of data) {
         for (let i = 0; i < 8; i++) {
@@ -284,7 +261,7 @@ function calculateEntropy(data) {
         }
     }
 
-    // Calcular la entropía usando la fórmula de Shannon
+    // Calcular la entropia usando la fórmula de Shannon
     let entropy = 0;
     for (let [_, freq] of frequencies) {
         const probability = freq / totalBits;
@@ -294,7 +271,7 @@ function calculateEntropy(data) {
     return entropy;
 }
 
-// Función para calcular métricas del canal
+// Funcion para calcular metricas del canal
 function calculateChannelMetrics(channelMatrix, prioriEntropy) {
     const posterioriEntropy = calculatePosterioriEntropy(channelMatrix);
     const equivocation = calculateEquivocation(channelMatrix);
@@ -308,7 +285,7 @@ function calculateChannelMetrics(channelMatrix, prioriEntropy) {
     };
 }
 
-// Función para calcular la entropía a posteriori
+// Funcion para calcular la entropia a posteriori
 function calculatePosterioriEntropy(channelMatrix) {
     let entropy = 0;
     for (let i = 0; i < 2; i++) {
@@ -321,7 +298,7 @@ function calculatePosterioriEntropy(channelMatrix) {
     return entropy;
 }
 
-// Función para calcular la equivocación
+// Funcion para calcular la equivocacion
 function calculateEquivocation(channelMatrix) {
     let H = 0;
     for (let i = 0; i < 2; i++) {
@@ -337,30 +314,25 @@ function calculateEquivocation(channelMatrix) {
     return H;
 }
 
-// Funciones de impresión
+// Funciones de impresion
 function printChannelMatrix(matrix) {
     console.log('P(y|x):\n');
-    console.log('     y=0    y=1');
+    console.log('     y=0      y=1');
     console.log(`x=0  ${matrix[0][0].toFixed(4)}  ${matrix[0][1].toFixed(4)}`);
     console.log(`x=1  ${matrix[1][0].toFixed(4)}  ${matrix[1][1].toFixed(4)}\n`);
 }
 
 function printMessageAnalysis(analysis) {
-    console.log('\nAnálisis de mensajes:');
+    console.log('\nd - Análisis de mensajes:');
     console.log(`Total de matrices analizadas: ${analysis.totalMatrices}`);
     console.log(`- Matrices correctas: ${analysis.correct}`);
     console.log(`- Matrices con errores no corregibles: ${analysis.errors}`);
-    console.log(`- Matrices corregidas: ${analysis.corrected}`);
-    
-    console.log('\nDetalles de errores:');
-    analysis.errorDetails.forEach(detail => {
-        console.log(detail.message);
-    });
+    console.log(`- Matrices con errores corregibles: ${analysis.corregible}`);
 }
 
 
 function printMetrics(metrics) {
-    console.log('\n5. Métricas del canal:');
+    console.log('\ne. Métricas del canal:');
     console.log(`- Entropía a priori: ${metrics.prioriEntropy.toFixed(4)} bits`);
     console.log(`- Entropía a posteriori: ${metrics.posterioriEntropy.toFixed(4)} bits`);
     console.log(`- Equivocación: ${metrics.equivocation.toFixed(4)} bits`);
