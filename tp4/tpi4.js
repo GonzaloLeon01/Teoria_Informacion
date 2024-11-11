@@ -13,8 +13,8 @@ function main() {
     const sentData = fs.readFileSync(sentFile);
     const receivedData = fs.readFileSync(receivedFile);
 
-    const sentEntropy = calculateEntropy(sentData);
-    console.log('\na. Entropía de la fuente binaria:', sentEntropy.toFixed(4), 'bits');
+    const sentEntropyAndProbs = calculateEntropyAndProbabilities(sentData);
+    console.log('\na. Entropía de la fuente binaria:', sentEntropyAndProbs.entropy.toFixed(4), 'bits');
 
     // Crear matrices para datos enviados (calculando bits de paridad)
     const sentMatrices = createParityMatrices(sentData, N);
@@ -32,8 +32,9 @@ function main() {
     printMessageAnalysis(messageAnalysis);
 
     // Calcular métricas
-    const metrics = calculateChannelMetrics(channelMatrix, sentEntropy);
+    const metrics = calculateChannelMetrics(channelMatrix, sentEntropyAndProbs);
     printMetrics(metrics);
+    //console.log(sentEntropyAndProbs);
 }
 
 /*
@@ -189,29 +190,34 @@ function estimateChannelMatrix(sentMatrices, receivedMatrices) {
         '1->1': 0
     };
 
-    let totalBits = 0;
+    let totalBitsDown = 0;
+    let totalBitsUp = 0;
 
     // Comparar solo los bits de datos (no los de paridad)
     const minMatrices = Math.min(sentMatrices.length, receivedMatrices.length);
     for (let m = 0; m < minMatrices; m++) {
         const N = sentMatrices[m].length - 1; // Tamaño real de la matriz de datos
-
         for (let i = 0; i < N; i++) {
             for (let j = 0; j < N; j++) {
                 const sentBit = sentMatrices[m][i][j];
                 const receivedBit = receivedMatrices[m][i][j];
-
+                console.log('recived:' + receivedBit + ' sent:' + sentBit);
                 const key = `${sentBit}->${receivedBit}`;
                 transitions[key]++;
-                totalBits++;
+                if (key == '0->0' || key == '0->1') {
+                    totalBitsUp++;
+                }
+                else {
+                    totalBitsDown++;
+                }
             }
         }
     }
-
+    console.log(transitions);
     // Calcular probabilidades
     const channelMatrix = [
-        [transitions['0->0'] / totalBits, transitions['0->1'] / totalBits],
-        [transitions['1->0'] / totalBits, transitions['1->1'] / totalBits]
+        [transitions['0->0'] / totalBitsUp, transitions['0->1'] / totalBitsUp],
+        [transitions['1->0'] / totalBitsDown, transitions['1->1'] / totalBitsDown]
     ];
 
     return channelMatrix;
@@ -307,7 +313,7 @@ function checkMatrixParity(matrix, N) {
  */
 
 // Funcion para calcular la entropia de una fuente binaria
-function calculateEntropy(data) {
+function calculateEntropyAndProbabilities(data) {
     const frequencies = new Map();
     const totalBits = data.length * 8;  // Total de bits en el archivo
     // Contar las frecuencias de 0s y 1s en el archivo
@@ -318,58 +324,53 @@ function calculateEntropy(data) {
         }
     }
 
+
     // Calcular la entropia usando la fórmula de Shannon
     let entropy = 0;
+    let probs = [];
     for (let [_, freq] of frequencies) {
         const probability = freq / totalBits;
+        probs.push(probability);
         entropy -= probability * Math.log2(probability);
     }
-
-    return entropy;
+    console.log(probs);
+    return { entropy, probs };
 }
 
-// Funcion para calcular metricas del canal
-function calculateChannelMetrics(channelMatrix, prioriEntropy) {
-    const posterioriEntropy = calculatePosterioriEntropy(channelMatrix);
-    const equivocation = calculateEquivocation(channelMatrix);
-    const mutualInformation = prioriEntropy - equivocation;
 
+function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
+    // Calcular p(b=0) y p(b=1) con la suma del producto de p(a_j) y p(b_j | a_j)
+    const p_b = channelMatrix[0].map((_, j) => channelMatrix.reduce((acc, fila, i) => acc + fila[j] * sentEntropyAndProbs.probs[i], 0));
+
+    const sum_bj = channelMatrix[0].map((_, j) => channelMatrix.reduce((acc, fila) => acc + fila[j], 0));
+    // Calcular p(a|b=0) y p(a|b=1) usando las probabilidades condicionales
+    const p_aj_bj = channelMatrix.map((fila, i) =>
+        fila.map((p_bj_given_aj, j) => {
+            return sum_bj[j] !== 0 ? p_bj_given_aj / sum_bj[j] : 0;
+        })
+    );
+    // Calcular entropía H(A|b=0) y H(A|b=1) usando las columnas de p_aj_bj
+    function entropia(probabilidades) {
+        return probabilidades.reduce((acc, p) => p > 0 ? acc + p * Math.log2(1 / p) : acc, 0);
+    }
+
+    const posterioriEntropies = []
+    // Calcular H(A|b=0) y H(A|b=1) utilizando las columnas de p_aj_bj
+    posterioriEntropies[0] = entropia(p_aj_bj.map(row => row[0]));
+    posterioriEntropies[1] = entropia(p_aj_bj.map(row => row[1]));
+    // Calcular la equivocación (entropía condicional promedio)
+    const prioriEntropy = sentEntropyAndProbs.entropy;
+    const equivocation = p_b[0] * posterioriEntropies[0] + p_b[1] * posterioriEntropies[1];
+    const mutualInformation = prioriEntropy - equivocation;
     return {
         prioriEntropy,
-        posterioriEntropy,
+        posterioriEntropies,
         equivocation,
         mutualInformation
     };
 }
 
-// Funcion para calcular la entropia a posteriori
-function calculatePosterioriEntropy(channelMatrix) {
-    let entropy = 0;
-    for (let i = 0; i < 2; i++) {
-        for (let j = 0; j < 2; j++) {
-            if (channelMatrix[i][j] > 0) {
-                entropy -= channelMatrix[i][j] * Math.log2(channelMatrix[i][j]);
-            }
-        }
-    }
-    return entropy;
-}
 
-// Funcion para calcular la equivocacion
-function calculateEquivocation(channelMatrix) {
-    let H = 0;
-    for (let i = 0; i < 2; i++) {
-        const rowSum = channelMatrix[i].reduce((a, b) => a + b, 0);
-        if (rowSum > 0) {
-            for (let j = 0; j < 2; j++) {
-                if (channelMatrix[i][j] > 0) {
-                    H -= channelMatrix[i][j] * Math.log2(channelMatrix[i][j] / rowSum);
-                }
-            }
-        }
-    }
-    return H;
-}
 
 // Funciones de impresion
 function printChannelMatrix(matrix) {
@@ -391,7 +392,7 @@ function printMessageAnalysis(analysis) {
 function printMetrics(metrics) {
     console.log('\ne. Métricas del canal:');
     console.log(`- Entropía a priori: ${metrics.prioriEntropy.toFixed(4)} bits`);
-    console.log(`- Entropía a posteriori: ${metrics.posterioriEntropy.toFixed(4)} bits`);
+    console.log(`- Entropía a posteriori: H(A/b=0) = ${metrics.posterioriEntropies[0]} bits, H(A/b=1) = ${metrics.posterioriEntropies[1]}`);
     console.log(`- Equivocación: ${metrics.equivocation.toFixed(4)} bits`);
     console.log(`- Información mutua: ${metrics.mutualInformation.toFixed(4)} bits`);
 }
