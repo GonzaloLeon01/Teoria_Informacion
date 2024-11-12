@@ -63,10 +63,6 @@ function createParityMatrices(data, N) {
     for (let m = 0; m < totalMatrices; m++) {
         // Crear matriz (N+1)x(N+1) inicializada con ceros
         const matrix = Array(N + 1).fill().map(() => Array(N + 1).fill(0));
-        console.log("Matriz N x N ceros:");
-        for (let row of matrix) {
-            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
         // Llenar la matriz NxN con los bits de datos
         // Recorrer la matriz y asignar los bits
         for (let i = 0; i < N; i++) {
@@ -84,10 +80,7 @@ function createParityMatrices(data, N) {
                 bitIndex++;
             }
         }
-        console.log("Matriz N x N con bits de datos:");
-        for (let row of matrix) {
-            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
+
         // Calcular bits de paridad de filas (última columna)
         for (let i = 0; i < N; i++) {
             let rowParity = matrix[i][0];
@@ -96,10 +89,7 @@ function createParityMatrices(data, N) {
             }
             matrix[i][N] = rowParity;
         }
-        console.log("Matriz N x N con paridad en última columna:");
-        for (let row of matrix) {
-            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
+
         // Calcular bits de paridad de columnas (última fila)
         for (let j = 0; j < N; j++) {
             let colParity = matrix[0][j];
@@ -108,10 +98,7 @@ function createParityMatrices(data, N) {
             }
             matrix[N][j] = colParity;
         }
-        console.log("Matriz N x N con paridad en última fila:");
-        for (let row of matrix) {
-            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
+
         // Calcular bit de paridad total (esquina inferior derecha: A.K.A: ultimo elemento)
         let totalParity = matrix[0][N];
         // XOR de los bits de paridad de filas
@@ -150,10 +137,6 @@ function loadReceivedMatrices(data, N) {
     for (let m = 0; m < totalMatrices; m++) {
         // Crear matriz (N+1)x(N+1)
         const matrix = Array(N + 1).fill().map(() => Array(N + 1).fill(0));
-        console.log("Matriz N x N ceros:");
-        for (let row of matrix) {
-            console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
         // Leer N+1 filas, cada una con N+1 bits (N bits de datos + 1 bit de paridad, ultima fila = bits de paridad)
         for (let i = 0; i <= N; i++) {
             for (let j = 0; j <= N; j++) {
@@ -349,6 +332,14 @@ function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
             return sum_bj[j] !== 0 ? p_bj_given_aj / sum_bj[j] : 0;
         })
     );
+    /*
+    const p_aj_bj = [
+        [ 0.8000, 0.1818 ],
+        [ 0.2000, 0.8182 ]
+      ];
+      segun el excel da esto👀 rari
+    */
+    console.log(p_aj_bj);
     // Calcular entropía H(A|b=0) y H(A|b=1) usando las columnas de p_aj_bj
     function entropia(probabilidades) {
         return probabilidades.reduce((acc, p) => p > 0 ? acc + p * Math.log2(1 / p) : acc, 0);
@@ -362,11 +353,18 @@ function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
     const prioriEntropy = sentEntropyAndProbs.entropy;
     const equivocation = p_b[0] * posterioriEntropies[0] + p_b[1] * posterioriEntropies[1];
     const mutualInformation = prioriEntropy - equivocation;
+    //ruido o equivocacion H(A/B)
+    //perdida H(B/A)
+    // Calcular entropía H(B|a=0) y H(B|a=1) usando las columnas de p_bj_aj
+    posterioriEntropies[3] = entropia(channelMatrix[0]);
+    posterioriEntropies[4] = entropia(channelMatrix[1]);
+    const perdida = p_b[0] * posterioriEntropies[3] + p_b[1] * posterioriEntropies[4];
     return {
         prioriEntropy,
         posterioriEntropies,
         equivocation,
-        mutualInformation
+        mutualInformation,
+        perdida
     };
 }
 
@@ -392,9 +390,10 @@ function printMessageAnalysis(analysis) {
 function printMetrics(metrics) {
     console.log('\ne. Métricas del canal:');
     console.log(`- Entropía a priori: ${metrics.prioriEntropy.toFixed(4)} bits`);
-    console.log(`- Entropía a posteriori: H(A/b=0) = ${metrics.posterioriEntropies[0]} bits, H(A/b=1) = ${metrics.posterioriEntropies[1]}`);
-    console.log(`- Equivocación: ${metrics.equivocation.toFixed(4)} bits`);
+    console.log(`- Entropía a posteriori: \n\tH(A/b=0) = ${metrics.posterioriEntropies[0]} bits, \n\tH(A/b=1) = ${metrics.posterioriEntropies[1]} bits, \n\tH(B/a=0) = ${metrics.posterioriEntropies[3]} bits, \n\tH(B/a=1) = ${metrics.posterioriEntropies[4]} bits`);
+    console.log(`- Equivocación H(A/B): ${metrics.equivocation.toFixed(4)} bits`);
     console.log(`- Información mutua: ${metrics.mutualInformation.toFixed(4)} bits`);
+    console.log(`- Perdida H(B/A): ${metrics.perdida.toFixed(4)} bits`);
 }
 
 // Ejecutar el programa
