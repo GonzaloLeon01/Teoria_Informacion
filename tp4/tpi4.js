@@ -349,12 +349,13 @@ function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
             return sum_bj[j] !== 0 ? p_bj_given_aj / sum_bj[j] : 0;
         })
     );
+    console.log(p_aj_bj);
     // Calcular entropía H(A|b=0) y H(A|b=1) usando las columnas de p_aj_bj
     function entropia(probabilidades) {
         return probabilidades.reduce((acc, p) => p > 0 ? acc + p * Math.log2(1 / p) : acc, 0);
     }
 
-    const posterioriEntropies = []
+    const posterioriEntropies = [];
     // Calcular H(A|b=0) y H(A|b=1) utilizando las columnas de p_aj_bj
     posterioriEntropies[0] = entropia(p_aj_bj.map(row => row[0]));
     posterioriEntropies[1] = entropia(p_aj_bj.map(row => row[1]));
