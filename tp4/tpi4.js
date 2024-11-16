@@ -9,7 +9,10 @@ function main() {
     const sentFile = process.argv[2];
     const receivedFile = process.argv[3];
     const N = parseInt(process.argv[4]);
-
+    if (N < 1) {
+        console.log('Uso: N debe ser mayor a 0');
+        process.exit(1);
+    }
     const sentData = fs.readFileSync(sentFile);
     const receivedData = fs.readFileSync(receivedFile);
 
@@ -51,14 +54,14 @@ function createParityMatrices(data, N) {
         // Usar `toString(2)` para convertir a binario, y luego rellenar con ceros a la izquierda si es necesario
         binaryString += byte.toString(2).padStart(8, '0');
     }
-    console.log("data binaria ", binaryString);
+    //console.log("data binaria ", binaryString);
 
 
     const matrices = [];
     const totalBits = data.length * 8;
     const matrixSize = N * N;
     const totalMatrices = Math.ceil(totalBits / matrixSize);
-    console.log(`${data}  ${totalBits} ${matrixSize} ${totalMatrices}`);
+    console.log(`  totalBits: ${totalBits} matrixSize: ${matrixSize} totalMatrices: ${totalMatrices}`);
     let bitIndex = 0;
     for (let m = 0; m < totalMatrices; m++) {
         // Crear matriz (N+1)x(N+1) inicializada con ceros
@@ -106,10 +109,10 @@ function createParityMatrices(data, N) {
             totalParity ^= matrix[i][N];
         }
         matrix[N][N] = totalParity;
-        console.log("Matriz N x N con XOR ultima esquina:");
+        /*console.log("Matriz N x N con XOR ultima esquina:");
         for (let row of matrix) {
             console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
+        }*/
         matrices.push(matrix);
     }
 
@@ -124,15 +127,16 @@ function loadReceivedMatrices(data, N) {
         // Usar `toString(2)` para convertir a binario, y luego rellenar con ceros a la izquierda si es necesario
         binaryString += byte.toString(2).padStart(8, '0');
     }
-    console.log("data binaria ", binaryString);
+    //console.log("data binaria ", binaryString);
 
 
 
     const matrices = [];
     const bitsPerMatrix = (N + 1) ** 2; // N+1 filas con N+1 bits cada una
     const totalBits = data.length * 8;
-    const totalMatrices = Math.floor(totalBits / bitsPerMatrix);
-    console.log(`${data}  ${bitsPerMatrix} ${totalBits} ${totalMatrices}`);
+    var totalMatrices = Math.floor(totalBits / bitsPerMatrix);
+    totalMatrices += (totalMatrices === 0);
+    console.log(`totalBits:${totalBits}  bitsPerMatrix: ${bitsPerMatrix} totalMatrices: ${totalMatrices}`);
     let bitIndex = 0;
     for (let m = 0; m < totalMatrices; m++) {
         // Crear matriz (N+1)x(N+1)
@@ -155,10 +159,10 @@ function loadReceivedMatrices(data, N) {
 
         }
 
-        console.log("Matriz N x N recreada:");
+        /*console.log("Matriz N x N recreada:");
         for (let row of matrix) {
             console.log(row.join(' ')); // Imprimir cada fila separada por espacios
-        }
+        }*/
         matrices.push(matrix);
     }
 
@@ -175,16 +179,18 @@ function estimateChannelMatrix(sentMatrices, receivedMatrices) {
 
     let totalBitsDown = 0;
     let totalBitsUp = 0;
-
+    //console.log(sentMatrices);
+    //console.log(receivedMatrices);
     // Comparar solo los bits de datos (no los de paridad)
     const minMatrices = Math.min(sentMatrices.length, receivedMatrices.length);
     for (let m = 0; m < minMatrices; m++) {
         const N = sentMatrices[m].length - 1; // Tamaño real de la matriz de datos
+
         for (let i = 0; i < N; i++) {
             for (let j = 0; j < N; j++) {
                 const sentBit = sentMatrices[m][i][j];
                 const receivedBit = receivedMatrices[m][i][j];
-                console.log('recived:' + receivedBit + ' sent:' + sentBit);
+                //console.log('recived:' + receivedBit + ' sent:' + sentBit);
                 const key = `${sentBit}->${receivedBit}`;
                 transitions[key]++;
                 if (key == '0->0' || key == '0->1') {
@@ -196,6 +202,7 @@ function estimateChannelMatrix(sentMatrices, receivedMatrices) {
             }
         }
     }
+
     console.log(transitions);
     // Calcular probabilidades
     const channelMatrix = [
@@ -224,7 +231,7 @@ function analyzeReceivedMessages(matrices, N) {
         }
         else if (result.isCorrectible) {
             corregible++;
-            errors++;
+            //errors++;
         }
         else {
             errors++;
@@ -243,51 +250,60 @@ function checkMatrixParity(matrix, N) {
     let errorRows = [];
     let errorCols = [];
 
+    let differencesRowCount = [0, 0];
+
     // Verificar paridad de filas
-    for (let i = 0; i < N; i++) {
-        let rowXOR = matrix[i][0];
+    for (let i = 0; i <= N; i++) {
+
+        let rowSum = matrix[i][0];
         // XOR de todos los bits de la fila incluyendo el bit de paridad
         for (let j = 1; j <= N; j++) {
-            rowXOR ^= matrix[i][j];
+            rowSum += matrix[i][j];
         }
-        if (rowXOR !== 0) {
-            errorRows.push(i);
+        differencesRowCount[rowSum % 2]++;
+        if (differencesRowCount[0] > 1 && differencesRowCount[1] > 1) {//esto deberia cambiar 
+            //error irreparable
+            return {
+                isCorrect: false,
+                isCorrectible: false,
+            }
         }
     }
-
+    let differencesColCount = [0, 0];
     // Verificar paridad de columnas
-    for (let j = 0; j < N; j++) {
-        let colXOR = matrix[0][j];
+    for (let j = 0; j <= N; j++) {
+
+        let colSum = matrix[0][j];
         // XOR de todos los bits de la columna incluyendo el bit de paridad
         for (let i = 1; i <= N; i++) {
-            colXOR ^= matrix[i][j];
+            colSum += matrix[i][j];
         }
-        if (colXOR !== 0) {
-            errorCols.push(j);
+        differencesColCount[colSum % 2]++;
+        if (differencesColCount[0] > 1 && differencesColCount[1] > 1) {
+            return {
+                isCorrect: false,
+                isCorrectible: false,
+            }
         }
     }
 
-    // Si no hay errores
-    if (errorRows.length === 0 && errorCols.length === 0) {
-        return {
-            isCorrect: true,
-            isCorrectible: false
-        };
-    }
-
-    // Si hay exactamente un error (un par i,j)
-    if (errorRows.length === 1 && errorCols.length === 1) {
+    if ( (differencesRowCount[0] == 1 ||differencesRowCount[1] == 1) && (differencesColCount[0] == 1 ||differencesColCount[1] == 1)  ) {
         return {
             isCorrect: false,
             isCorrectible: true,
         };
     }
-
+    if ( (differencesRowCount[0] == 0 ||differencesRowCount[1] == 0) && (differencesColCount[0] == 0 ||differencesColCount[1] == 0)  ) {
+        return {
+            isCorrect: true,
+            isCorrectible: false,
+        };
+    }
     // Si hay multiples errores
     return {
         isCorrect: false,
         isCorrectible: false,
-    };
+    }
 }
 
 
@@ -323,23 +339,36 @@ function calculateEntropyAndProbabilities(data) {
 
 function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
     // Calcular p(b=0) y p(b=1) con la suma del producto de p(a_j) y p(b_j | a_j)
+    sentEntropyAndProbs.probs.reverse();//en otro lado mejol
     const p_b = channelMatrix[0].map((_, j) => channelMatrix.reduce((acc, fila, i) => acc + fila[j] * sentEntropyAndProbs.probs[i], 0));
+
 
     const sum_bj = channelMatrix[0].map((_, j) => channelMatrix.reduce((acc, fila) => acc + fila[j], 0));
     // Calcular p(a|b=0) y p(a|b=1) usando las probabilidades condicionales
-    const p_aj_bj = channelMatrix.map((fila, i) =>
-        fila.map((p_bj_given_aj, j) => {
-            return sum_bj[j] !== 0 ? p_bj_given_aj / sum_bj[j] : 0;
+    const p_ai_bj2 = channelMatrix.map((fila, i) =>
+        fila.map((p_bj_given_ai, j) => {
+            return sum_bj[j] !== 0 ? p_bj_given_ai / sum_bj[j] : 0;
         })
     );
-    /*
-    const p_aj_bj = [
-        [ 0.8000, 0.1818 ],
-        [ 0.2000, 0.8182 ]
-      ];
-      segun el excel da esto👀 rari
-    */
-    console.log(p_aj_bj);
+
+
+    const Pai_bj = channelMatrix.map((fila, i) =>
+        fila.map((p_bj_given_ai, j) => {
+            return p_bj_given_ai * sentEntropyAndProbs.probs[i];
+        })
+    );
+    const p_ai_bj = Pai_bj.map((fila, i) =>
+        fila.map((p_bj_given_ai, j) => {
+            //console.log(p_bj_given_ai +  " / " +  p_b[j]);
+            return (p_b[j] != 0) ? p_bj_given_ai / p_b[j] : 0;
+        })
+    );
+    //console.log(p_b);
+    //console.log(p_ai_bj2);
+    //console.log(p_ai_bj);
+
+
+    //console.log(p_ai_bj);
     // Calcular entropía H(A|b=0) y H(A|b=1) usando las columnas de p_aj_bj
     function entropia(probabilidades) {
         return probabilidades.reduce((acc, p) => p > 0 ? acc + p * Math.log2(1 / p) : acc, 0);
@@ -347,8 +376,8 @@ function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
 
     const posterioriEntropies = [];
     // Calcular H(A|b=0) y H(A|b=1) utilizando las columnas de p_aj_bj
-    posterioriEntropies[0] = entropia(p_aj_bj.map(row => row[0]));
-    posterioriEntropies[1] = entropia(p_aj_bj.map(row => row[1]));
+    posterioriEntropies[0] = entropia(p_ai_bj.map(row => row[0]));
+    posterioriEntropies[1] = entropia(p_ai_bj.map(row => row[1]));
     // Calcular la equivocación (entropía condicional promedio)
     const prioriEntropy = sentEntropyAndProbs.entropy;
     const equivocation = p_b[0] * posterioriEntropies[0] + p_b[1] * posterioriEntropies[1];
@@ -391,7 +420,7 @@ function printMetrics(metrics) {
     console.log('\ne. Métricas del canal:');
     console.log(`- Entropía a priori: ${metrics.prioriEntropy.toFixed(4)} bits`);
     console.log(`- Entropía a posteriori: \n\tH(A/b=0) = ${metrics.posterioriEntropies[0]} bits, \n\tH(A/b=1) = ${metrics.posterioriEntropies[1]} bits, \n\tH(B/a=0) = ${metrics.posterioriEntropies[3]} bits, \n\tH(B/a=1) = ${metrics.posterioriEntropies[4]} bits`);
-    console.log(`- Equivocación H(A/B): ${metrics.equivocation.toFixed(4)} bits`);
+    console.log(`- Equivocación/ruido H(A/B): ${metrics.equivocation.toFixed(4)} bits`);
     console.log(`- Información mutua: ${metrics.mutualInformation.toFixed(4)} bits`);
     console.log(`- Perdida H(B/A): ${metrics.perdida.toFixed(4)} bits`);
 }
