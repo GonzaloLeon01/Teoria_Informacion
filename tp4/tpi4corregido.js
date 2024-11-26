@@ -28,7 +28,6 @@ function main() {
     // Calcular la entropia a priori H(A) considerando todos los bits (incluyendo paridad)
     const channelInputProbs = calculateChannelInputProbabilities(sentMatrices);
     const channelInputEntropy = calculateEntropy(channelInputProbs);
-
     // Estimar matriz de probabilidades del canal (incluyendo bits de paridad)
     const channelMatrix = estimateChannelMatrix(sentMatrices, receivedMatrices);
     console.log('\nc. Matriz de probabilidades del canal:');
@@ -256,7 +255,7 @@ function calculateChannelMetrics(channelMatrix, inputProbs, prioriEntropy) {
     const posterioriEntropies = calculatePosterioriEntropies(p_a_given_b);
 
     // Calcular equivocacion H(A|B)
-    const equivocation = calculateEquivocation(inputProbs, channelMatrix);
+    const equivocation = calculateEquivocation(p_b, posterioriEntropies);
 
     // Calcular perdida H(B|A)
     const loss = calculateLoss(inputProbs, channelMatrix);
@@ -305,11 +304,6 @@ function calculateConditionalProbabilities(channelMatrix, inputProbs, outputProb
     // Crear matriz para almacenar P(a|b)
     const conditionalProbabilities = Array(numInputSymbols).fill().map(() => Array(numOutputSymbols).fill(0));
     
-    // Debug: Imprimir valores de entrada
-    console.log('Channel Matrix:', channelMatrix);
-    console.log('Input Probabilities:', inputProbs);
-    console.log('Output Probabilities:', outputProbs);
-    
     // Para cada símbolo de entrada (a)
     for (let inputIndex = 0; inputIndex < numInputSymbols; inputIndex++) {
         // Para cada símbolo de salida (b)
@@ -325,16 +319,9 @@ function calculateConditionalProbabilities(channelMatrix, inputProbs, outputProb
             const p_a = inputProbs[inputIndex];                          // P(a)
             const p_b = outputProbs[outputIndex];                        // P(b)
             
-            // Debug: Imprimir valores intermedios
-            console.log(`Calculating P(a${inputIndex}|b${outputIndex}):`);
-            console.log(`P(b${outputIndex}|a${inputIndex}) = ${p_b_given_a}`);
-            console.log(`P(a${inputIndex}) = ${p_a}`);
-            console.log(`P(b${outputIndex}) = ${p_b}`);
-            
             const result = (p_b_given_a * p_a) / p_b;
-            console.log(`Result = ${result}`);
-            
-            // Verificar que el resultado sea un número válido
+    
+            // Verificar que el resultado sea un numero válido
             if (isNaN(result) || !isFinite(result)) {
                 console.error('Invalid probability calculated:', result);
                 conditionalProbabilities[inputIndex][outputIndex] = 0;
@@ -343,19 +330,6 @@ function calculateConditionalProbabilities(channelMatrix, inputProbs, outputProb
             }
         }
     }
-    
-    // Debug: Verificar que las probabilidades sumen 1 para cada columna
-    for (let j = 0; j < numOutputSymbols; j++) {
-        const sum = conditionalProbabilities.reduce((acc, row) => acc + row[j], 0);
-        console.log(`Sum of probabilities for b${j}: ${sum}`);
-        if (Math.abs(sum - 1) > 0.0001) {
-            console.warn(`Warning: Probabilities for b${j} do not sum to 1 (${sum})`);
-        }
-    }
-    
-    // Debug: Imprimir matriz resultante
-    console.log('Conditional Probabilities Matrix:');
-    console.log(conditionalProbabilities);
     
     return conditionalProbabilities;
 }
@@ -377,16 +351,14 @@ function calculatePosterioriEntropies(p_a_given_b) {
     return posterioriEntropies;
 }
 
-function calculateEquivocation(inputProbs, channelMatrix) {
+function calculateEquivocation(p_b, posterioriEntropies) {
     let equivocation = 0;
-
-    // Iterar sobre cada fila de la matriz (valores de A)
-    for (let i = 0; i < channelMatrix.length; i++) {
-        // Calcular la entropía de la fila (P(B | A = a_i))
-        const rowEntropy = calculateEntropy(channelMatrix[i]);
-        // Ponderar por la probabilidad de entrada P(A = a_i)
-        equivocation += inputProbs[i] * rowEntropy;
+    
+    // H(A|B) = ∑ P(b)*H(A|b)
+    for (let j = 0; j < p_b.length; j++) {
+        equivocation += p_b[j] * posterioriEntropies[j];
     }
+    
     return equivocation;
 }
 
