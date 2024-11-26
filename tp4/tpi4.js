@@ -203,7 +203,7 @@ function estimateChannelMatrix(sentMatrices, receivedMatrices) {
         }
     }
 
-    console.log(transitions);
+    console.log(transitions,totalBitsUp,totalBitsDown);
     // Calcular probabilidades
     const channelMatrix = [
         [transitions['0->0'] / totalBitsUp, transitions['0->1'] / totalBitsUp],
@@ -321,7 +321,7 @@ function calculateEntropyAndProbabilities(data) {
             const bit = (byte >> i) & 1;
             frequencies.set(bit, (frequencies.get(bit) || 0) + 1);
         }
-    }
+    } 
 
 
     // Calcular la entropia usando la fórmula de Shannon
@@ -363,13 +363,7 @@ function calculateChannelMetrics(channelMatrix, sentEntropyAndProbs) {
             return (p_b[j] != 0) ? p_bj_given_ai / p_b[j] : 0;
         })
     );
-    //console.log(p_b);
-    //console.log(p_ai_bj2);
-    //console.log(p_ai_bj);
 
-
-    //console.log(p_ai_bj);
-    // Calcular entropía H(A|b=0) y H(A|b=1) usando las columnas de p_aj_bj
     function entropia(probabilidades) {
         return probabilidades.reduce((acc, p) => p > 0 ? acc + p * Math.log2(1 / p) : acc, 0);
     }
