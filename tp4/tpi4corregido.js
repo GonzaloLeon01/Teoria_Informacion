@@ -18,7 +18,7 @@ function main() {
 
     const sentEntropyAndProbs = calculateEntropyAndProbabilities(sentData);
     console.log('\na. Entropía de la fuente binaria:', sentEntropyAndProbs.entropy.toFixed(4), 'bits');
-
+    console.log(sentEntropyAndProbs);
     // Crear matrices para datos enviados (calculando bits de paridad)
     const sentMatrices = createParityMatrices(sentData, N);
 
@@ -34,7 +34,7 @@ function main() {
     printChannelMatrix(channelMatrix);
 
     // Analizar mensajes
-    const messageAnalysis = analyzeReceivedMessages(sentMatrices, receivedMatrices, N);
+    const messageAnalysis = analyzeReceivedMessages(receivedMatrices, N);
     printMessageAnalysis(messageAnalysis);
 
     // Calcular metricas
@@ -206,42 +206,68 @@ function estimateChannelMatrix(sentMatrices, receivedMatrices) {
     ];
 }
 
-function analyzeReceivedMessages(sentMatrices, receivedMatrices, N) {
+function analyzeReceivedMessages(receivedMatrices, N) {
     let correct = 0;
     let errors = 0;
     let corregible = 0;
 
-    for (let m = 0; m < Math.min(sentMatrices.length, receivedMatrices.length); m++) {
-        const result = compareMatrices(sentMatrices[m], receivedMatrices[m], N);
+    for (let m = 0; m < receivedMatrices.length; m++) {
+        const result = analyzeParityBits(receivedMatrices[m], N);
 
-        if (result.errorCount === 0) {
+        if (result.errors === 0) {
             correct++;
-        } else if (result.errorCount === 1) {
+        } else if (result.errors === 1) {
             corregible++;
         } else {
             errors++;
         }
     }
+
     return {
         correct,
         errors,
         corregible,
-        totalMatrices: Math.min(sentMatrices.length, receivedMatrices.length)
+        totalMatrices: receivedMatrices.length
     };
 }
 
-function compareMatrices(sentMatrix, receivedMatrix, N) {
-    let errorCount = 0;
-    
-    for (let i = 0; i <= N; i++) {
+function analyzeParityBits(receivedMatrix, N) {
+    let rowErrors = 0;
+    let colErrors = 0;
+    let errorRow = -1;
+    let errorCol = -1;
+
+    for (let i = 0; i < N; i++) {
+        let rowParity = 0;
         for (let j = 0; j <= N; j++) {
-            if (sentMatrix[i][j] !== receivedMatrix[i][j]) {
-                errorCount++;
-            }
+            rowParity ^= receivedMatrix[i][j];
+        }
+        if (rowParity !== 0) {
+            rowErrors++;
+            errorRow = i;
         }
     }
 
-    return errorCount;
+    for (let j = 0; j < N; j++) {
+        let colParity = 0;
+        for (let i = 0; i <= N; i++) {
+            colParity ^= receivedMatrix[i][j];
+        }
+        if (colParity !== 0) {
+            colErrors++;
+            errorCol = j;
+        }
+    }
+
+    if (rowErrors === 1 && colErrors === 1) {
+        return { errors: 1, position: { row: errorRow, col: errorCol } };
+    }
+    else if (rowErrors === 0 && colErrors === 0) {
+        return { errors: 0 };
+    }
+    else {
+        return { errors: 2 };
+    }
 }
 
 function calculateChannelMetrics(channelMatrix, inputProbs, prioriEntropy) {
